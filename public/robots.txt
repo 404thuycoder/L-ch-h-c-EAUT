@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Allow: /schedule/week
+Allow: /schedule/term
+Allow: /schedule/exam
+
+Sitemap: https://lichhoceaut.vercel.app/sitemap.xml
