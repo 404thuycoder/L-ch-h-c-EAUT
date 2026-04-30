@@ -46,6 +46,11 @@ app.post("/schedule", async (req, res) => {
   try {
     const result = await getStudentSchedule(formData.username, formData.password, { useCache: true });
     req.session.studentLogin = { username: formData.username, password: formData.password, studentName: result.studentName };
+    
+    // Background pre-fetch for extra speed
+    getStudentTermSchedule(formData.username, formData.password, { useCache: true, fetchAll: true }).catch(() => {});
+    getStudentExamSchedule(formData.username, formData.password, { useCache: true, fetchAll: true }).catch(() => {});
+
     res.redirect("/schedule/week");
   } catch (error) {
     res.render("index", { 

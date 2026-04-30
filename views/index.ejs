@@ -1,98 +1,21 @@
 <%
-  // Global utilities defined at the top to ensure availability in all scriptlets
-  norm = (value) =>
-    (value || "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/đ/g, "d")
-      .replace(/Đ/g, "D")
-      .toLowerCase()
-      .trim();
-
-  toInt = (value) => {
-    const match = String(value || "").match(/\d+/);
-    return match ? Number(match[0]) : 9999;
-  };
-
-  parseDate = (value) => {
-    const m = String(value || "").match(/(\d{1,2})\D(\d{1,2})\D(\d{2,4})/);
-    if (!m) return null;
-    let year = Number(m[3]);
-    if (year < 100) year += 2000;
-    const date = new Date(year, Number(m[2]) - 1, Number(m[1]));
-    return Number.isNaN(date.getTime()) ? null : date;
-  };
-
+  // High-end utilities for the premium UI
+  norm = (value) => (value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase().trim();
+  toInt = (value) => { const m = String(value || "").match(/\d+/); return m ? Number(m[0]) : 9999; };
   accentFromText = (text) => {
     const source = String(text || "").trim() || "EAUT";
     let hash = 0;
     for (let i = 0; i < source.length; i += 1) hash = (hash * 31 + source.charCodeAt(i)) >>> 0;
     return `hsl(${hash % 360} 78% 72%)`;
   };
-
   dayLabel = (dayIndex) => (dayIndex === 8 ? "Chủ nhật" : `Thứ ${dayIndex}`);
-
-
-  isGenericLabel = (value) => {
-    const text = norm(value);
-    return (
-      !text ||
-      ["sang", "chieu", "toi", "ca", "-", "dang cap nhat", "đang cập nhật"].includes(text) ||
-      /^thu\s+\d$/.test(text) ||
-      /^thứ\s+\d$/.test(text)
-    );
-  };
-
-  compactText = (value) =>
-    String(value || "")
-      .replace(/\s+/g, " ")
-      .replace(/\s*\.\s*/g, ". ")
-      .trim();
-
-  shiftFromPeriodStart = (periodStart, sessionText) => {
-    const start = toInt(periodStart);
-    const session = String(sessionText || "").toLowerCase();
+  shiftFromPeriodStart = (p, s) => {
+    const start = toInt(p);
     if (start >= 1 && start <= 3) return { shift: 1, range: "7:00 - 9:30" };
     if (start >= 4 && start <= 6) return { shift: 2, range: "9:40 - 12:10" };
     if (start >= 7 && start <= 9) return { shift: 3, range: "13:00 - 15:30" };
     if (start >= 10 && start <= 12) return { shift: 4, range: "15:40 - 18:10" };
-    if (start >= 13) return { shift: 5, range: "18:30 - 21:00" };
-    if (session.includes("ca 1") || session.includes("sang") || session.includes("sáng")) return { shift: 1, range: "7:00 - 9:30" };
-    if (session.includes("ca 2")) return { shift: 2, range: "9:40 - 12:10" };
-    if (session.includes("ca 3") || session.includes("chieu") || session.includes("chiều")) return { shift: 3, range: "13:00 - 15:30" };
-    if (session.includes("ca 4")) return { shift: 4, range: "15:40 - 18:10" };
-    if (session.includes("ca 5") || session.includes("toi") || session.includes("tối")) return { shift: 5, range: "18:30 - 21:00" };
-    if (start <= 3) return { shift: 1, range: "7:00 - 9:30" };
-    if (start <= 6) return { shift: 2, range: "9:40 - 12:10" };
-    if (start <= 9) return { shift: 3, range: "13:00 - 15:30" };
-    if (start <= 12) return { shift: 4, range: "15:40 - 18:10" };
     return { shift: 5, range: "18:30 - 21:00" };
-  };
-
-  deduplicate = (str) => {
-    if (!str) return "";
-    // First, split by our injected | or naturally occurring spaces
-    const parts = str.split(/(?:\s*\|\s*)/).filter(Boolean);
-    if (parts.length > 0) {
-      // If delimited by |, deduplicate those exact parts
-      const uniqueParts = [...new Set(parts)];
-      str = uniqueParts.join(" | ");
-    }
-    
-    // Now handle cases where text is concatenated without | like "Sáng Sáng Sáng"
-    let s = str.trim();
-    for (let len = 1; len <= Math.floor(s.length / 2); len++) {
-      const sub = s.substring(0, len).trim();
-      if (sub.length < 2) continue;
-      const subParts = s.split(sub).map(x => x.trim()).filter(x => x.length > 0);
-      if (subParts.length === 0) {
-        return sub; // Perfect repetition found
-      }
-    }
-    
-    // Special heuristic for "Sáng Sáng Sáng - 23/03..."
-    str = str.replace(/([^\s]{3,})(?:\s+\1)+/g, "$1"); // "Sáng Sáng Sáng" -> "Sáng"
-    return str.replace(/(Bùi Thanh Loan)\s+\1\s+\1/g, "$1").replace(/(Tòa nhà EAUT-105)\s+\1/g, "$1");
   };
 %>
 <!DOCTYPE html>
@@ -100,91 +23,47 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lịch học EAUT - Xem thời khóa biểu sinh viên Công nghệ Đông Á</title>
-    <meta name="description" content="Hệ thống xem lịch học, lịch thi sinh viên EAUT thông minh, giao diện Pastel hiện đại, dễ nhìn. Tra cứu thời khóa biểu Đại học Công nghệ Đông Á nhanh chóng." />
-    <meta name="keywords" content="lịch học eaut, thời khóa biểu eaut, sinh viên eaut, tra cứu lịch học, đại học công nghệ đông á, eaut schedule" />
-    <meta name="author" content="Anh Thùy IT" />
-    <meta name="robots" content="index, follow" />
-
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://lichhoceaut.vercel.app/" />
-    <meta property="og:title" content="Lịch học EAUT - Xem thời khóa biểu sinh viên Công nghệ Đông Á" />
-    <meta property="og:description" content="Giao diện xem lịch học EAUT hiện đại, Pastel, hỗ trợ lọc môn học và xem lịch thi cực nhanh." />
-    <meta property="og:image" content="https://lichhoceaut.vercel.app/og-image.png" />
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://lichhoceaut.vercel.app/" />
-    <meta property="twitter:title" content="Lịch học EAUT - Xem thời khóa biểu sinh viên Công nghệ Đông Á" />
-    <meta property="twitter:description" content="Giao diện xem lịch học EAUT hiện đại, Pastel, hỗ trợ lọc môn học và xem lịch thi cực nhanh." />
-    <meta property="twitter:image" content="https://lichhoceaut.vercel.app/og-image.png" />
-
-    <!-- Structured Data (JSON-LD) -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "Lịch học EAUT",
-      "description": "Hệ thống xem lịch học sinh viên Đại học Công nghệ Đông Á",
-      "url": "https://lichhoceaut.vercel.app/",
-      "applicationCategory": "EducationalApplication",
-      "operatingSystem": "All",
-      "author": {
-        "@type": "Person",
-        "name": "Anh Thùy IT"
-      }
-    }
-    </script>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+    <title>Lịch học EAUT - Giao diện Premium</title>
     <link rel="stylesheet" href="/styles.css" />
-    <link rel="canonical" href="https://lichhoceaut.vercel.app/" />
+    <style>
+      #progressBar { position: fixed; top: 0; left: 0; height: 3px; background: var(--primary); z-index: 9999; width: 0%; transition: width 0.3s ease; display: none; }
+      .loading-overlay { position: fixed; inset: 0; background: rgba(8, 10, 22, 0.98); backdrop-filter: blur(15px); display: flex; align-items: center; justify-content: center; z-index: 10000; }
+      .spinner { width: 60px; height: 60px; border: 5px solid rgba(124, 139, 255, 0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1.5rem; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .is-hidden { display: none !important; }
+    </style>
   </head>
-  <body>
+  <body class="dashboard-layout">
+    <div id="progressBar"></div>
     <div class="app-shell">
-      <div class="sidebar-backdrop" data-sidebar-backdrop style="position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); z-index:950; display:none;"></div>
       <div class="app-layout">
-        <aside class="sidebar" data-sidebar>
+        <aside class="sidebar">
           <a class="sidebar-brand" href="/">
-            <div class="brand-badge" aria-hidden="true">
-              <span style="font-size: 20px;">📚</span>
-            </div>
+            <div class="brand-badge">📚</div>
             <div>
               <div class="sidebar-title">EAUT Schedule</div>
               <div class="sidebar-subtitle">Pastel · Gọn · Dễ nhìn</div>
             </div>
           </a>
-
-          <nav class="sidebar-nav" aria-label="Menu">
-            <a class="nav-item <%= (!result || (result.viewType !== 'term' && result.viewType !== 'exam')) ? 'is-active' : '' %>" href="/schedule/week" data-nav-item="weekly">
-              <span class="nav-icon" aria-hidden="true">🗓️</span>
+          <nav class="sidebar-nav">
+            <a class="nav-item <%= activeTab === 'week' ? 'is-active' : '' %>" href="/schedule/week">
+              <span class="nav-icon">🗓️</span>
               <span class="nav-label">Lịch học tuần</span>
-              <span class="nav-hint">Weekly</span>
+              <span class="nav-hint">WEEKLY</span>
             </a>
-            <a class="nav-item <%= (result && result.viewType === 'term') ? 'is-active' : '' %>" href="/schedule/term" data-nav-item="term">
-              <span class="nav-icon" aria-hidden="true">📅</span>
+            <a class="nav-item <%= activeTab === 'term' ? 'is-active' : '' %>" href="/schedule/term">
+              <span class="nav-icon">📅</span>
               <span class="nav-label">Lịch học kỳ</span>
-              <span class="nav-hint">Term</span>
+              <span class="nav-hint">TERM</span>
             </a>
-            <a class="nav-item <%= (result && result.viewType === 'exam') ? 'is-active' : '' %>" href="/schedule/exam" data-nav-item="exams">
-              <span class="nav-icon" aria-hidden="true">🧸</span>
+            <a class="nav-item <%= activeTab === 'exam' ? 'is-active' : '' %>" href="/schedule/exam">
+              <span class="nav-icon">🧸</span>
               <span class="nav-label">Lịch thi</span>
-              <span class="nav-hint">Exams</span>
-            </a>
-            <a class="nav-item" href="https://sinhvien.eaut.edu.vn/Login.aspx" target="_blank" rel="noreferrer" data-nav-item="link">
-              <span class="nav-icon" aria-hidden="true">🔗</span>
-              <span class="nav-label">Cổng EAUT</span>
-              <span class="nav-hint">Link</span>
+              <span class="nav-hint">EXAMS</span>
             </a>
           </nav>
-
           <div class="sidebar-footer">
-            <div class="cute-tip">
-              Mẹo nhỏ: bạn có thể lọc nhanh theo <strong>môn/phòng/giảng viên</strong> và chuyển chế độ xem bảng khi cần.
-            </div>
+            <div class="cute-tip">Mẹo nhỏ: bạn có thể lọc nhanh theo <strong>môn/phòng/giảng viên</strong> và chuyển chế độ xem bảng khi cần.</div>
           </div>
         </aside>
 
@@ -192,926 +71,179 @@
           <header class="site-header">
             <div class="header-inner">
               <div class="header-left">
-                <button class="icon-btn hamburger" type="button" data-sidebar-toggle aria-label="Mở menu">
-                  <span class="hamburger" aria-hidden="true">
-                    <span></span><span></span><span></span>
-                  </span>
-                </button>
+                <button class="icon-btn" data-sidebar-toggle>☰</button>
                 <div style="min-width:0">
                   <div class="header-title">Lịch học EAUT</div>
                   <div class="header-subtitle">Anh Thùy IT - 15C2</div>
                 </div>
               </div>
-
               <div class="header-actions">
-                <% if (result) { %>
-                <button class="icon-btn" type="button" id="refreshBtn" aria-label="Làm mới dữ liệu" title="Làm mới dữ liệu">
-                  <span aria-hidden="true">🔄</span>
-                </button>
-                <% } %>
-                <button class="icon-btn" type="button" data-theme-toggle aria-label="Đổi giao diện sáng/tối" title="Dark mode">
-                  <span class="theme-icon-dark" aria-hidden="true">🌙</span>
-                  <span class="theme-icon-light" aria-hidden="true">☀️</span>
-                </button>
-
-                <% if (result) { %>
-                  <details class="user-menu" style="position:relative;">
-                    <summary class="icon-btn user-btn" aria-label="Tài khoản" title="Tài khoản" style="list-style:none; cursor: pointer;">
-                      <div>
-                        <div><%= result.studentName || "Sinh viên" %></div>
-                        <div><%= formData.username %></div>
-                      </div>
-                      <svg class="user-icon-svg" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                    </summary>
-                    <div
-                      style="
-                        position:absolute; right:0; top:calc(100% + 10px);
-                        min-width: 220px;
-                        background: var(--surface-solid, #151a36);
-                        border: 1px solid var(--line);
-                        border-radius: 18px;
-                        box-shadow: var(--shadow-lg);
-                        padding: 1rem;
-                        z-index: 1001;
-                        color: var(--text-main);
-                      "
-                    >
-                      <div style="font-weight:900; font-size: 1rem;">Tài khoản</div>
-                      <div style="color:var(--text-muted); font-size:0.85rem; margin-top:0.25rem;">
-                        <%= result.studentName || "Sinh viên" %>
-                      </div>
-                      <div style="color:var(--text-dim); font-size:0.8rem;">MSSV: <%= formData.username %></div>
-                      <div style="margin-top:1rem; display:grid; gap:0.5rem;">
-                        <a class="btn btn-ghost btn-sm" href="/logout" style="justify-content: flex-start;">🚪 Đăng xuất</a>
-                      </div>
-                    </div>
-                  </details>
+                <button class="icon-btn" data-theme-toggle>🌙</button>
+                <% if (studentName) { %>
+                  <div class="user-pill"><%= studentName %></div>
+                  <a class="btn btn-ghost btn-sm" href="/logout">Đăng xuất</a>
                 <% } else { %>
-                  <a class="btn btn-primary btn-sm" href="#dang-nhap">Đăng nhập</a>
+                  <a class="btn btn-primary btn-sm" href="/">Đăng nhập</a>
                 <% } %>
               </div>
             </div>
           </header>
 
           <main class="page-content" id="workspace">
-
-
-            <section class="workspace-layout <%= result ? "is-logged-in" : "" %>">
-              <% if (!result) { %>
-              <div class="auth-section">
-                <aside class="panel auth-panel" id="dang-nhap">
-                  <h2>Đăng nhập</h2>
-                  <p class="muted">Nhập tài khoản để đồng bộ lịch học từ hệ thống sinh viên.</p>
-                  <form action="/schedule" method="post" class="login-form">
-                    <div class="field">
-                      <label for="username">Mã sinh viên</label>
-                      <input id="username" name="username" type="text" autocomplete="username" required value="<%= formData.username %>" placeholder="2400xxxx" />
-                    </div>
-                    <div class="field">
-                      <label for="password">Mật khẩu</label>
-                      <input id="password" name="password" type="password" autocomplete="current-password" required value="<%= formData.password %>" placeholder="Mật khẩu cổng EAUT" />
-                    </div>
-                    <button type="submit" class="btn btn-primary">Đồng bộ lịch học</button>
-                  </form>
-                  <% if (error) { %>
-                  <div class="alert alert-error" style="margin-top: 1rem;"><%= error %></div>
-                  <% } %>
-                </aside>
-
-                <aside class="panel donate-panel">
-                  <div class="donate-header">
+            <% if (!studentName) { %>
+              <div class="workspace-layout">
+                <div class="auth-section">
+                  <aside class="panel auth-panel">
+                    <h2>Đăng nhập</h2>
+                    <p class="muted">Đồng bộ lịch học tức thì từ hệ thống sinh viên.</p>
+                    <form action="/schedule" method="post" id="loginForm">
+                      <div class="field">
+                        <label>Mã sinh viên</label>
+                        <input name="username" type="text" required placeholder="2400xxxx" value="<%= (typeof formData !== 'undefined' && formData.username) || '' %>" />
+                      </div>
+                      <div class="field">
+                        <label>Mật khẩu</label>
+                        <input name="password" type="password" required placeholder="Mật khẩu" />
+                      </div>
+                      <button type="submit" class="btn btn-primary">Đồng bộ lịch học</button>
+                    </form>
+                    <% if (typeof error !== 'undefined' && error) { %>
+                      <div class="alert alert-error" style="margin-top: 1rem;"><%= error %></div>
+                    <% } %>
+                  </aside>
+                  <aside class="panel donate-panel">
                     <h3>Duy trì Web ☕</h3>
-                    <span class="badge-new">Anh Thùy IT</span>
-                  </div>
-                  <p>Hệ thống này được phát triển hoàn toàn miễn phí nhằm giúp các bạn sinh viên EAUT có trải nghiệm xem lịch tốt hơn.</p>
-                  <div class="donate-card">
-                    <div style="font-size: 0.8rem; font-weight: 800; color: var(--text-muted); margin-bottom: 0.5rem;">ỦNG HỘ TÁC GIẢ</div>
-                    <div class="donate-row">
-                      <span>MB Bank (Quân đội):</span>
-                      <strong>23920000000006</strong>
+                    <div class="donate-card">
+                      <div class="donate-row"><span>MB Bank:</span> <strong>23920000000006</strong></div>
+                      <div class="donate-row"><span>Chủ TK:</span> <strong>PHUNG VINH THUY</strong></div>
                     </div>
-                    <div class="donate-row">
-                      <span>Chủ TK:</span>
-                      <strong>PHUNG VINH THUY</strong>
-                    </div>
-                  </div>
-                  <p class="muted small" style="margin-top: 1rem; line-height: 1.4;">Mọi sự ủng hộ từ các bạn đều là nguồn động lực lớn để mình duy trì server và cập nhật thêm các tính năng mới. Cảm ơn các bạn rất nhiều! ❤️</p>
-                </aside>
-              </div>
-              <% } %>
-
-            <% if (result) { %>
-            <%
-              // Initialize variables with defaults
-              let mappedRows = [];
-              let weekDays = [];
-              let totalSessions = 0;
-              let uniqueCourses = 0;
-              let uniqueDays = 0;
-
-              // Only process weekly grid if headers and rows exist
-              if (result.headers && result.rows) {
-                const findHeaderIndex = (patterns) => {
-                  if (!result.headers) return -1;
-                  return result.headers.findIndex((header) => patterns.some((pattern) => norm(header).includes(pattern)));
-                };
-                const idxDay = findHeaderIndex(["thu"]);
-                const idxDate = findHeaderIndex(["ngay"]);
-                const idxCourse = findHeaderIndex(["mon", "hoc phan"]);
-                const idxRoom = findHeaderIndex(["phong"]);
-                const idxTeacher = findHeaderIndex(["giang vien", "gv", "teacher", "vien"]);
-                const idxPeriodStart = findHeaderIndex(["tiet bat dau", "bat dau"]);
-                const idxPeriodCount = findHeaderIndex(["so tiet"]);
-                const idxTime = findHeaderIndex(["gio hoc", "thoi gian"]);
-                const idxSession = findHeaderIndex(["buoi", "ca", "shift"]);
-                const idxClass = findHeaderIndex(["lop", "nhom"]);
-                const idxMode = findHeaderIndex(["hinh thuc", "cach hoc"]);
-
-                const getDayIndex = (dayText, dateText) => {
-                  const d = toInt(dayText);
-                  if (d >= 2 && d <= 8) return d;
-                  const parsed = parseDate(dateText);
-                  if (!parsed) return null;
-                  const jsDay = parsed.getDay();
-                  return jsDay === 0 ? 8 : jsDay + 1;
-                };
-
-                const pickFirstMeaningful = (row, preferredIndexes) => {
-                  for (const idx of preferredIndexes) {
-                    if (idx < 0) continue;
-                    const value = compactText(row[idx] || "");
-                    if (!isGenericLabel(value)) return value;
-                  }
-                  const fallbacks = row
-                    .map((cell) => compactText(cell || ""))
-                    .filter((cell) => cell && !isGenericLabel(cell) && !/^\d+$/.test(cell));
-                  return fallbacks[0] || "";
-                };
-
-                const sanitizeField = (value, fallback) => {
-                  const text = compactText(value || "");
-                  return text && !isGenericLabel(text) ? text : fallback;
-                };
-
-                const extractFromRaw = (rawText) => {
-                  const text = compactText(String(rawText || "").normalize("NFC"));
-                  const teacherMatch = text.match(/(?:GV|Gi[aả]ng\s*vi[eê]n|Giang\s*vien)[:\s]+(.+?)(?=\s*(?:Ph[oò]ng|H[iì]nh\s*th[ứu]c|M[aã]\s*l[oớ]p|Ti[eê]t|$))/i);
-                  const roomMatch = text.match(/(?:Phong|Phòng)[:\s]+([^\n]+?)(?=\s*(?:GV|Giảng|Hình|Hinh|Mã|Ma|Tiết|Tiet|$))/i);
-                  const dayMatch = text.match(/(?:Thu|Thứ)[:\s]*([2-8])/i);
-                  const periodMatch = text.match(/Tiết(?:\s*học)?[:\s]*(\d+)\s*[-–—]\s*(\d+)/i);
-                  const periodSingle = text.match(/Tiết(?:\s*học)?[:\s]*(\d{1,2})/i);
-                  const coursePart = text.split(/(?:Ti[eê]t|M[aã]\s*l[oớ]p|GV|Gi[aả]ng|Ph[oò]ng|H[iì]nh)/i)[0].replace(/^L[oớ]p\s*h[oọ]c[:\-]?\s*/i, "").trim();
-                  const modeMatch = text.match(/(?:Hinh\s*thuc|Hình\s*thức)[:\s]+(.+?)(?=\s*(?:GV|Giảng|Phòng|Phong|Mã|Ma|Tiết|Tiet|$))/i);
-                  return {
-                    course: coursePart,
-                    room: roomMatch ? roomMatch[1].trim() : "",
-                    teacher: teacherMatch ? teacherMatch[1].trim() : "",
-                    mode: modeMatch ? modeMatch[1].trim() : "",
-                    dayIndex: dayMatch ? Number(dayMatch[1]) : null,
-                    periodStart: periodMatch ? periodMatch[1] : periodSingle ? periodSingle[1] : "",
-                    periodCount: periodMatch ? String(Number(periodMatch[2]) - Number(periodMatch[1]) + 1) : "",
-                  };
-                };
-
-                const cleanCourseName = (text) => {
-                  if (!text) return "";
-                  let s = String(text).normalize("NFC").trim();
-                  s = s.replace(/\s*[Tt]i[ếe]t\s*[Hh]ọc\s*/gi, "");
-                  s = s.replace(/\s*[Tt]i[ếe]t\s*/gi, "");
-                  const splitters = [/M[aã]\s*l[oớ]p/i, /GV/i, /Gi[aả]ng\s*vi[eê]n/i, /[:\-\(\[]/];
-                  for (const reg of splitters) {
-                    const parts = s.split(reg);
-                    if (parts.length > 1) s = parts[0];
-                  }
-                  return s.replace(/\s+[Hh]ọc$/gi, "").replace(/^L[oớ]p\s*h[oọ]c[:\-]?\s*/i, "").trim();
-                };
-
-                mappedRows = result.rows.map((row, index) => {
-                  const day = idxDay >= 0 ? row[idxDay] || "Không rõ thứ" : "Không rõ thứ";
-                  const date = idxDate >= 0 ? row[idxDate] || "" : "";
-                  const rawText = compactText(row.join(" "));
-                  const parsed = extractFromRaw(rawText);
-                  const dayIndex = getDayIndex(day, date) || parsed.dayIndex;
-                  const course = pickFirstMeaningful(row, [idxCourse, idxClass]);
-                  const room = pickFirstMeaningful(row, [idxRoom]);
-                  const teacher = pickFirstMeaningful(row, [idxTeacher]);
-                  const time = pickFirstMeaningful(row, [idxTime]);
-                  const mode = pickFirstMeaningful(row, [idxMode]);
-                  const pStartRaw = idxPeriodStart >= 0 ? row[idxPeriodStart] || "-" : "-";
-                  const pCountRaw = idxPeriodCount >= 0 ? row[idxPeriodCount] || "-" : "-";
-                  const finalCourse = cleanCourseName(course || parsed.course || "");
-                  const finalRoom = room === "Đang cập nhật" ? parsed.room : room;
-                  const finalTeacher = teacher === "Đang cập nhật" ? parsed.teacher : teacher;
-                  const finalPeriodStart = String(pStartRaw || "-").includes("-") ? String(pStartRaw).split("-")[0].trim() : pStartRaw || parsed.periodStart || "-";
-                  const finalPeriodCount = pCountRaw && pCountRaw !== "-" ? pCountRaw : parsed.periodCount || "-";
-                  
-                  return {
-                    id: index,
-                    day, date, dayIndex,
-                    course: sanitizeField(finalCourse, "Môn học"),
-                    room: sanitizeField(finalRoom, "Đang cập nhật"),
-                    teacher: sanitizeField(finalTeacher, "Đang cập nhật"),
-                    periodStart: sanitizeField(finalPeriodStart, parsed.periodStart || "-"),
-                    periodCount: sanitizeField(finalPeriodCount, "-"),
-                    time: sanitizeField(time, "-"),
-                    mode: sanitizeField(mode, parsed.mode || "").replace(/^h[oọ]c[:\s]*/i, ""),
-                    session: idxSession >= 0 ? String(row[idxSession] || "").trim() : "",
-                  };
-                }).filter((item) => {
-                  const badCourse = isGenericLabel(item.course);
-                  const missingMainInfo = item.room === "Đang cập nhật" && item.teacher === "Đang cập nhật" && item.time === "-";
-                  return !(badCourse && missingMainInfo);
-                });
-
-                mappedRows.sort((a, b) => {
-                  const dayA = a.dayIndex || 99;
-                  const dayB = b.dayIndex || 99;
-                  if (dayA !== dayB) return dayA - dayB;
-                  return toInt(a.periodStart) - toInt(b.periodStart);
-                });
-
-                weekDays = [2, 3, 4, 5, 6, 7].map((dayIndex) => {
-                  const dayItems = mappedRows.filter((item) => item.dayIndex === dayIndex);
-                  const dateFromData = dayItems.find((x) => x.date)?.date || "";
-                  return {
-                    dayIndex,
-                    key: `day-${dayIndex}`,
-                    title: dayLabel(dayIndex),
-                    date: dateFromData,
-                    items: dayItems,
-                    count: dayItems.length,
-                    uniqueCourses: [...new Set(dayItems.map((x) => x.course).filter(Boolean))].length,
-                    shifts: [1, 2, 3, 4, 5].map((shift) => ({
-                      shift,
-                      range: shift === 1 ? "7:00 - 9:30" : shift === 2 ? "9:40 - 12:10" : shift === 3 ? "13:00 - 15:30" : shift === 4 ? "15:40 - 18:10" : "18:30 - 21:00",
-                      items: dayItems.filter((item) => shiftFromPeriodStart(item.periodStart, item.session).shift === shift),
-                    })),
-                  };
-                });
-
-                totalSessions = mappedRows.length;
-                uniqueCourses = [...new Set(mappedRows.map((row) => row.course).filter(Boolean))].length;
-                uniqueDays = weekDays.filter((d) => d.count > 0).length;
-              }
-            %>
-            <section class="panel schedule-panel" id="lich-hoc" data-section="lich-hoc">
-          <% if (!result.viewType || result.viewType === 'week') { %>
-          <div class="result-header">
-            <div>
-              <h2>Lịch học của bạn</h2>
-              <p class="muted">Cập nhật: <%= result.fetchedAt %></p>
-              <% if (result.selectedWeekLabel) { %>
-              <p class="muted">Tuần: <%= result.selectedWeekLabel %></p>
-              <% } %>
-              <p class="muted">
-                Số ca trong tuần: <strong><%= totalSessions %></strong> · Số môn khác nhau: <strong><%= uniqueCourses %></strong> · Số ngày có học: <strong><%= uniqueDays %></strong>
-              </p>
-            </div>
-          </div>
-
-          <div class="schedule-toolbar weekly-toolbar">
-            <div class="toolbar-group">
-              <form action="/schedule/week" method="get" class="week-form">
-                <label for="selectedWeek">Tuần học</label>
-                <select id="selectedWeek" name="week" onchange="this.form.submit()">
-                  <% (result.weekOptions || []).forEach((week) => { %>
-                  <option value="<%= week.value %>" <%= week.value === result.selectedWeekValue ? "selected" : "" %>>
-                    <%= week.label %>
-                  </option>
-                  <% }) %>
-                </select>
-              </form>
-            </div>
-
-            <div class="toolbar-group" style="flex:1; min-width: 200px;">
-              <label for="subjectFilter">Lọc nhanh</label>
-              <input id="subjectFilter" type="text" placeholder="Môn / Phòng / GV..." style="width: 100%;" />
-            </div>
-
-            <div class="toolbar-group">
-              <label>Chế độ xem</label>
-              <div class="view-switch">
-                <button type="button" class="btn btn-ghost btn-sm is-active" data-view-mode="table">Bảng</button>
-                <button type="button" class="btn btn-ghost btn-sm" data-view-mode="list">Danh sách</button>
-              </div>
-            </div>
-          </div>
-
-          <% if (result.autoSwitchedWeek) { %>
-          <div class="alert alert-info">
-            <%= result.originalWeekLabel %> hiện chưa có lịch học. Hệ thống tự động chuyển sang <strong><%= result.selectedWeekLabel %></strong> (gần nhất có dữ liệu) để bạn tiện theo dõi.
-          </div>
-          <% } %>
-
-          <% if (!result.hasData) { %>
-          <div class="alert alert-info">
-            Đã đăng nhập và mở đúng trang lịch học, nhưng hiện tại không có buổi học nào trong dữ liệu.
-            Bạn thử chọn tuần/kỳ khác trên cổng EAUT rồi tải lại.
-          </div>
-          <% } %>
-
-          <div class="week-board" data-view-block="table">
-            <div class="week-board__legend muted">
-              Ca 1: 7:00-9:30 · Ca 2: 9:40-12:10 · Ca 3: 13:00-15:30 · Ca 4: 15:40-16:10 · Ca 5: 18:30-21:00
-            </div>
-
-            <div class="week-grid-wrap">
-              <table class="week-grid" aria-label="Lịch học theo tuần">
-                <thead>
-                  <tr>
-                    <th class="week-grid__corner">Ca</th>
-                    <% weekDays.forEach((day) => { %>
-                      <th class="week-grid__day" data-day-key="<%= day.key %>">
-                        <div class="week-grid__dayTitle"><%= day.title %></div>
-                        <% if (day.date) { %><div class="week-grid__dayDate"><%= day.date %></div><% } %>
-                        <div class="week-grid__dayCount">Số ca: <strong><%= day.count %></strong></div>
-                        <div class="week-grid__dayCount">Số môn: <strong><%= day.uniqueCourses %></strong></div>
-                      </th>
-                    <% }) %>
-                  </tr>
-                </thead>
-                <tbody>
-                  <% [1,2,3,4,5].forEach((shift) => { %>
-                    <tr>
-                      <th class="week-grid__shift">
-                        <div class="week-grid__shiftNum">Ca <%= shift %></div>
-                        <div class="week-grid__shiftTime muted">
-                          <% 
-                            const getTimeRange = (s) => {
-                              if (s === 1) return ["7:00", "9:30"];
-                              if (s === 2) return ["9:40", "12:10"];
-                              if (s === 3) return ["13:00", "15:30"];
-                              if (s === 4) return ["15:40", "18:10"];
-                              return ["18:30", "21:00"];
-                            };
-                            const [start, end] = getTimeRange(shift);
-                          %>
-                          <span><%= start %></span>
-                          <div class="shift-divider">-</div>
-                          <span><%= end %></span>
-                        </div>
-                      </th>
-                      <% weekDays.forEach((day) => { %>
-                        <% const cell = day.shifts.find((s) => s.shift === shift); %>
-                        <td class="week-grid__cell" data-day-key="<%= day.key %>" data-shift="<%= shift %>">
-                          <% if (cell && cell.items && cell.items.length) { %>
-                            <div class="week-grid__cellStack">
-                              <% cell.items.forEach((item) => { %>
-                                <%
-                                  const si = shiftFromPeriodStart(item.periodStart, item.session);
-                                  const tietLabel = item.time && item.time !== '-' ? `Tiết ${item.time}` : `Ca ${si.shift}`;
-                                %>
-                                <div
-                                  class="session-item session-item--compact"
-                                  style="--accent: <%= accentFromText(item.course) %>;"
-                                  data-search-content="<%= [item.course, item.teacher, item.room, item.day, item.date, item.time].join(' ').toLowerCase() %>"
-                                >
-                                  <div class="session-item__top">
-                                    <div class="session-item__title"><%= item.course %></div>
-                                    <% if (item.time && item.time !== '-') { %>
-                                      <div class="tiet-badge">
-                                        Tiết
-                                        <span><%= item.time %></span>
-                                      </div>
-                                    <% } %>
-                                  </div>
-                                  <div class="session-item__sub">
-                                    <span class="si-room">📍 <%= item.room %></span>
-                                    <span class="si-teacher">👤 <%= item.teacher %></span>
-                                    <% if (item.mode) { %>
-                                      <span class="si-mode">📝 <%= item.mode %></span>
-                                    <% } %>
-                                  </div>
-                                </div>
-                              <% }) %>
-                            </div>
-                          <% } else { %>
-                            <div class="week-grid__empty"></div>
-                          <% } %>
-                        </td>
-                      <% }) %>
-                    </tr>
-                  <% }) %>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="list-view" data-view-block="list">
-            <div class="list-day-tabs">
-              <button type="button" class="btn btn-ghost btn-sm is-active" data-day-filter="all">Cả tuần</button>
-              <% weekDays.forEach((day) => { %>
-                <button type="button" class="btn btn-ghost btn-sm" data-day-filter="<%= day.dayIndex %>">
-                  <%= day.title %> (<%= day.count %>)
-                </button>
-              <% }) %>
-            </div>
-
-            <div class="list-day-groups">
-              <% weekDays.forEach((day) => { %>
-                <% if (day.items.length) { %>
-                  <article class="list-day-group" data-day-group="<%= day.dayIndex %>">
-                    <header class="list-day-header">
-                      <h3><%= day.title %> <% if (day.date) { %>· <%= day.date %><% } %></h3>
-                      <div class="count-badge">
-                        Số ca: <%= day.count %> · Số môn: <%= day.uniqueCourses %>
-                      </div>
-                    </header>
-                    <div class="list-items">
-                      <% day.items.forEach((item) => { %>
-                        <% const shiftInfo = shiftFromPeriodStart(item.periodStart, item.session); %>
-                        <div
-                          class="list-item"
-                          style="--accent: <%= accentFromText(item.course) %>;"
-                          data-search-content="<%= [item.course, item.teacher, item.room, item.day, item.date, item.time].join(' ').toLowerCase() %>"
-                          data-day-index="<%= item.dayIndex || '' %>"
-                        >
-                          <div class="list-item__left">
-                            <div class="shift-name">Ca <%= shiftInfo.shift %></div>
-                            <div class="shift-time"><%= shiftInfo.range %></div>
-                          </div>
-                          <div class="list-item__right">
-                            <div class="list-item__top">
-                              <h4><%= item.course %></h4>
-                              <% if (item.time && item.time !== '-') { %>
-                                <div class="tiet-badge">
-                                  Tiết
-                                  <span><%= item.time %></span>
-                                </div>
-                              <% } %>
-                            </div>
-                            <div class="meta">
-                              <div>📍 Phòng: <strong><%= item.room %></strong></div>
-                              <div>👤 Giảng viên: <strong><%= item.teacher %></strong></div>
-                              <% if (item.mode) { %>
-                                <div>📝 Hình thức: <strong><%= item.mode %></strong></div>
-                              <% } %>
-                            </div>
-                          </div>
-                        </div>
-                      <% }) %>
-                    </div>
-                  </article>
-                <% } %>
-              <% }) %>
-            </div>
-          </div>
-          <% } else if (result.viewType === 'term') { %>
-            <div class="term-view">
-              <div class="schedule-toolbar term-toolbar">
-                <form action="/schedule/term" method="get" class="week-form">
-                  <label for="selectedSemester">Học kỳ / Đợt học</label>
-                  <select id="selectedSemester" name="semester" onchange="this.form.submit()">
-                    <option value="all" <%= result.selectedSemester === 'all' ? "selected" : "" %>>-- Xem tất cả học kỳ --</option>
-                    <% (result.semesterOptions || []).forEach((opt) => { %>
-                      <% const isSelected = result.selectedSemester && result.selectedSemester !== 'all' ? opt.value === result.selectedSemester : opt.selected; %>
-                      <option value="<%= opt.value %>" <%= isSelected ? "selected" : "" %>><%= opt.label %></option>
-                    <% }) %>
-                  </select>
-                </form>
-              </div>
-
-              <% (result.results || []).reverse().forEach(semResult => { %>
-                <%
-                  const grouped = new Map();
-                  semResult.rows.forEach(row => {
-                    let id = "", name = "", className = "", credits = "", fee = "", teacher = "", sched = "", room = "";
-
-                    row.forEach(cell => {
-                      const text = (cell || "").trim();
-                      if (!text || text === "-" || text === "0" || norm(text) === "dang cap nhat") return;
-
-                      const lower = norm(text);
-
-                      // Bỏ qua các loại đăng ký và ca học gây nhiễu
-                      if (lower.includes("hoc binh thuong") || lower.includes("hoc lai") || lower.includes("hoc cai thien")) return;
-                      
-                      const shiftParts = lower.split(" | ").map(x => x.trim());
-                      if (shiftParts.length > 0 && shiftParts.every(x => ["sang", "chieu", "toi", "ca 1", "ca 2", "ca 3", "ca 4"].includes(x))) return;
-
-                      if (/^\d{1,3}([,.]\d{3})+$/.test(text)) {
-                        fee = text;
-                      }
-                      else if (/\d{2}\/\d{2}\/\d{2,4}/.test(text) || lower.includes("thu ") || lower.includes("tiet ")) {
-                        sched = sched ? sched + " | " + text : text;
-                      }
-                      else if (/toa nha|building|eaut|phong|tầng|tang/i.test(lower) || /^[A-Z]\d{2,3}$/.test(text)) {
-                        room = text;
-                      }
-                      else if (text.includes(" - ") && /[A-Z0-9._]{5,}/.test(text)) {
-                        const parts = text.split(" - ");
-                        if (!name) name = parts[0].trim();
-                        className = parts.slice(1).join(" - ").trim();
-                        if (!id) id = className.split(".")[0] || className;
-                      }
-                      else if (/^[A-Z]{2,6}\d{3,6}$/i.test(text)) {
-                        id = text;
-                      }
-                      else if (/(?:^[A-ZĐ0-9]{2,10}\.\d+)|(?:^[A-ZĐ0-9_.]+(?:_LT|_TH|LT|TH)$)/i.test(text)) {
-                        className = text;
-                      }
-                      else if (/^\d{1,2}$/.test(text) && !credits && !fee) {
-                        credits = text;
-                      }
-                      else if (!name && text.length > 3 && !lower.includes("tong so") && !/^\d+$/.test(text)) {
-                        name = text;
-                      }
-                      else if (name && !teacher && text.length > 5 && !/\d/.test(text)) {
-                        teacher = text;
-                      }
-                    });
-
-                    if (!name) name = id || className || "Môn học";
-                    if (!id) id = className || "N/A";
-                    if (!className) className = "Chưa có lớp";
-                    if (!teacher) teacher = "Đang cập nhật";
-                    if (!room) room = "Đang cập nhật";
-
-                    if (name === "Tổng số" || name === "Môn học") return;
-
-                    const hasValidFee = !!fee;
-                    const key = deduplicate(name).toLowerCase(); // Group by Tên học phần
-
-                    let item;
-                    if (!grouped.has(key)) {
-                      item = {
-                        id, 
-                        name: deduplicate(name), 
-                        className: deduplicate(className), 
-                        credits,
-                        teacher: deduplicate(teacher),
-                        room: deduplicate(room),
-                        schedules: [],
-                        hasValidFee
-                      };
-                      grouped.set(key, item);
-                    } else {
-                      item = grouped.get(key);
-                      // Ưu tiên dòng có giá tiền (thường là học thuyết)
-                      if (hasValidFee && !item.hasValidFee) {
-                        item.id = id;
-                        item.className = deduplicate(className);
-                        item.credits = credits;
-                        item.teacher = deduplicate(teacher);
-                        item.room = deduplicate(room);
-                        item.schedules = []; // Đặt lại lịch vì thay thế lớp
-                        item.hasValidFee = true;
-                      } else if (!hasValidFee && item.hasValidFee) {
-                        // Nếu dòng này không có phí mà dòng kia có:
-                        // Nếu TRÙNG LỚP, nghĩa là dòng này là dòng lịch thực hành, KHÔNG SKIP.
-                        // Nếu KHÁC LỚP, skip.
-                        if (item.className !== deduplicate(className)) {
-                          return;
-                        }
-                      } else if (item.className !== deduplicate(className)) {
-                        return; // Cùng trạng thái fee nhưng khác lớp -> skip
-                      }
-                    }
-
-                    const sText = deduplicate(sched);
-                    const rText = item.room;
-                    
-                    const isElearning = (!rText || rText === "Đang cập nhật" || rText === "-" || rText === "0") &&
-                                        (!sText || sText === "-" || sText === "0");
-
-                    let fullSched = "";
-                    if (isElearning) {
-                      fullSched = "Môn học E-learning";
-                    } else {
-                      let dates = sText.match(/\d{2}\/\d{2}\/\d{2,4}/g) || [];
-                      if (dates.length >= 2) {
-                        let parsed = dates.map(d => {
-                          let [D, M, Y] = d.split("/");
-                          if (Y.length === 2) Y = "20" + Y;
-                          return new Date(`${Y}-${M}-${D}`).getTime();
-                        }).filter(n => !isNaN(n));
-                        
-                        if (parsed.length > 0) {
-                          let minDate = new Date(Math.min(...parsed));
-                          let maxDate = new Date(Math.max(...parsed));
-                          
-                          let fMin = `${String(minDate.getDate()).padStart(2, '0')}/${String(minDate.getMonth()+1).padStart(2, '0')}/${String(minDate.getFullYear()).slice(-2)}`;
-                          let fMax = `${String(maxDate.getDate()).padStart(2, '0')}/${String(maxDate.getMonth()+1).padStart(2, '0')}/${String(maxDate.getFullYear()).slice(-2)}`;
-                          
-                          fullSched = `Từ ${fMin} đến ${fMax}`;
-                        } else {
-                          fullSched = sText ? sText.split(" | ")[0] : "Chưa có lịch";
-                        }
-                      } else if (dates.length === 1) {
-                        fullSched = `Bắt đầu từ ${dates[0]}`;
-                      } else {
-                        fullSched = sText ? sText.split(" | ")[0] : "Chưa có lịch";
-                      }
-                    }
-
-                    if (fullSched && !item.schedules.includes(fullSched)) {
-                      item.schedules.push(fullSched);
-                    }
-                  });
-                %>
-                <div class="list-day-header" style="margin-top: 2rem; border-color: var(--primary); display: flex; justify-content: space-between; align-items: flex-end;">
-                  <h3><%= semResult.semester %></h3>
-                  <div class="count-badge" style="margin-bottom: 0.5rem;">Tổng số tín chỉ: <strong><%= [...grouped.values()].reduce((acc, curr) => acc + (parseFloat(curr.credits) || 0), 0) %></strong></div>
+                  </aside>
                 </div>
-                <div class="term-grid">
-                  <% for (const item of grouped.values()) { %>
-                    <div class="term-card" style="--accent: <%= accentFromText(item.name) %>;">
-                      <div class="term-card__header">
-                        <div class="course-badge"><%= item.id.substring(0, 2) %></div>
-                        <div class="course-code"><%= item.id %> · <%= item.credits %> tín</div>
-                      </div>
-                      <h3><%= item.name %></h3>
-                      <div class="term-meta" style="display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.8rem;">
-                        <span>🏷️ Lớp: <strong><%= item.className %></strong></span>
-                        <span>👤 GV: <strong><%= item.teacher %></strong></span>
-                        <span>📍 Phòng: <strong><%= item.room %></strong></span>
-                      </div>
-                      <div class="term-schedule" style="margin-top: 1rem; padding-top: 0.8rem; border-top: 1px dashed var(--line);">
-                        <label style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px;">Thời gian học</label>
-                        <div class="schedule-text" style="white-space: pre-line; margin-top: 0.3rem;">
-                          <% item.schedules.forEach(s => { %>
-                            <div>• <%= s %></div>
+                <div class="panel empty-state" style="margin-top: 2rem; text-align: center; padding: 4rem 2rem;">
+                   <h2 style="font-size: 2rem; font-weight: 900; margin-bottom: 1rem;">Chưa có dữ liệu lịch học</h2>
+                   <p class="muted">Đăng nhập để hiển thị lịch học theo giao diện Premium mới.</p>
+                </div>
+            <% } else { %>
+              <% if (activeTab === 'week') { %>
+                <section class="panel schedule-panel">
+                   <div class="panel-header">
+                     <h2>Lịch học tuần của bạn</h2>
+                     <p class="muted">Cập nhật: <%= result.fetchedAt %></p>
+                   </div>
+                   <div class="schedule-toolbar">
+                      <div class="toolbar-group">
+                        <label>Tuần học</label>
+                        <select onchange="window.location.href='/schedule/week?week='+this.value">
+                          <% (result.weekOptions || []).forEach(w => { %>
+                            <option value="<%= w.value %>" <%= w.value === result.selectedWeekValue ? 'selected' : '' %>><%= w.label %></option>
                           <% }) %>
-                        </div>
+                        </select>
                       </div>
-                    </div>
-                  <% } %>
-                </div>
-              <% }) %>
-              <% if (!result.results || result.results.length === 0 || result.results.every(r => r.rows.length === 0)) { %>
-                <div class="alert alert-info" style="margin-top: 2rem;">
-                  Đã đăng nhập thành công nhưng không tìm thấy dữ liệu lịch học trong học kỳ này. 
-                  Bạn hãy thử chọn một học kỳ khác hoặc chọn "Xem tất cả học kỳ".
-                </div>
-              <% } %>
-            </div>
-          <% } else if (result.viewType === 'exam') { %>
-            <%
-              // Consolidate data grouping and sorting for exam view
-              let examSemesters = {};
-              (result.results || []).forEach(r => {
-                (r.rows || []).forEach(row => {
-                  if (row.length < 5) return;
-                  const semName = row[0] || "Học kỳ";
-                  if (!examSemesters[semName]) examSemesters[semName] = [];
-                  examSemesters[semName].push(row);
-                });
-              });
-
-              const sortedSemNames = Object.keys(examSemesters).sort((a, b) => {
-                const getScore = (s) => {
-                  const nums = s.match(/\d+/g) || [];
-                  if (nums.length >= 2) {
-                    const year = parseInt(nums[1]);
-                    const hk = parseInt(nums[0]);
-                    return year * 10 + hk;
-                  }
-                  return 0;
-                };
-                return getScore(b) - getScore(a);
-              });
-            %>
-            <div class="result-header" style="margin-bottom: 2rem;">
-              <div>
-                <h2>Lịch thi cử</h2>
-                <p class="muted">Cập nhật: <%= result.fetchedAt %></p>
-              </div>
-            </div>
-
-            <div class="schedule-toolbar weekly-toolbar">
-              <div class="toolbar-group" style="flex:1; min-width: 200px;">
-                <label for="examFilter">Lọc nhanh</label>
-                <input id="examFilter" type="text" placeholder="Môn / Phòng / SBD..." style="width: 100%;" />
-              </div>
-            </div>
-
-            <div class="term-layout">
-              <% sortedSemNames.forEach(semName => { %>
-                <div class="list-day-header" style="margin-top: 2.5rem; border-bottom: 2px solid var(--primary); padding-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: flex-end;">
-                  <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--text);"><%= semName %></h3>
-                  <span class="muted" style="font-size: 0.9rem;">Tổng cộng: <strong><%= examSemesters[semName].length %></strong> môn</span>
-                </div>
-
-                <div class="term-grid" style="margin-top: 1.5rem;">
-                  <% examSemesters[semName].forEach(row => {
-                       const subject = row[1] || "-";
-                       const attempt = row[2] || "-";
-                       const phase = row[3] || "-";
-                       const date = row[4] || "-";
-                       const shift = row[5] || "-";
-                       const time = row[6] || "-";
-                       const room = row[7] || "-";
-                       const sbd = row[8] || "-";
-                       const format = row[9] || "-";
-                  %>
-                    <div
-                      class="term-card exam-item"
-                      style="--accent: <%= accentFromText(subject) %>; display: flex; flex-direction: column;"
-                      data-search-content="<%= [subject, room, sbd, date, format].join(' ').toLowerCase() %>"
-                    >
-                      <div class="term-card-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.8rem;">
-                        <span class="term-id" style="background: var(--accent); color: white; padding: 0.25rem 0.6rem; border-radius: 8px; font-weight: 800; font-size: 0.75rem;">
-                          <%= format %>
-                        </span>
-                        <span class="term-credits" style="color: var(--muted); font-size: 0.85rem; font-weight: 700;">
-                          Lần <%= attempt %> · Đợt <%= phase %>
-                        </span>
+                      <div class="toolbar-group" style="flex:1;">
+                        <label>Lọc nhanh</label>
+                        <input id="subjectFilter" type="text" placeholder="Môn / Phòng / GV..." />
                       </div>
-                      
-                      <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text); line-height: 1.4;"><%= subject %></h3>
-                      
-                      <div class="exam-meta-grid" style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 0.75rem 1rem; margin-top: 1rem;">
-                        <div class="meta-item" style="display: flex; align-items: center; gap: 0.6rem;">
-                          <span style="font-size: 1rem; width: 20px; text-align: center;">📍</span>
-                          <span style="font-size: 0.85rem; color: var(--text-muted);">Phòng: <strong style="color: var(--text-main);"><%= room %></strong></span>
+                   </div>
+                   <div class="week-board">
+                     <table class="week-grid">
+                        <thead><tr><th>CA</th><% [2,3,4,5,6,7,8].forEach(d => { %><th><%= d===8 ? 'CN' : 'Thứ '+d %><br><small style="font-weight:400; opacity:0.7;"><%= (result.days && result.days[d-2] && result.days[d-2].date) || "" %></small></th><% }) %></tr></thead>
+                        <tbody>
+                          <% [1,2,3,4,5].forEach(s => { %>
+                            <tr>
+                              <th class="week-grid__shift">Ca <%= s %><br><small><%= shiftFromPeriodStart(s*3-2).range %></small></th>
+                              <% [2,3,4,5,6,7,8].forEach(d => { %>
+                                <td class="week-grid__cell">
+                                  <% (result.schedule || []).filter(item => item.dayIndex === d && shiftFromPeriodStart(item.periodStart).shift === s).forEach(course => { %>
+                                    <div class="session-item" style="border-left: 4px solid <%= accentFromText(course.subjectName) %>" data-search-content="<%= course.subjectName %> <%= course.room %> <%= course.teacherName %>">
+                                      <div class="session-name"><%= course.subjectName %></div>
+                                      <div class="session-meta">📍 <%= course.room %></div>
+                                      <div class="session-meta">👤 <%= course.teacherName %></div>
+                                      <div class="session-badge">Tiết <%= course.periodStart %>-<%= course.periodEnd %></div>
+                                    </div>
+                                  <% }) %>
+                                </td>
+                              <% }) %>
+                            </tr>
+                          <% }) %>
+                        </tbody>
+                     </table>
+                   </div>
+                </section>
+              <% } else if (activeTab === 'term') { %>
+                <section class="panel term-panel">
+                  <div class="panel-header"><h2>Lịch học kỳ</h2></div>
+                  <div class="term-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;">
+                    <% (result.courses || []).forEach(course => { %>
+                      <div class="term-card panel" style="padding: 1.5rem; border-top: 5px solid <%= accentFromText(course.subjectName) %>">
+                        <div class="card-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+                          <span class="badge" style="background:<%= accentFromText(course.subjectName) %>; color: #000; font-weight:800; font-size:0.7rem;"><%= course.subjectCode.substring(0,2).toUpperCase() %></span>
+                          <span class="muted small"><%= course.credits %> tín</span>
                         </div>
-                        <div class="meta-item" style="display: flex; align-items: center; gap: 0.6rem;">
-                          <span style="font-size: 1rem; width: 20px; text-align: center;">🏷️</span>
-                          <span style="font-size: 0.85rem; color: var(--text-muted);">SBD: <strong style="color: var(--primary);"><%= sbd %></strong></span>
+                        <h3 style="margin: 0.75rem 0; font-size: 1.1rem; line-height:1.4;"><%= course.subjectName %></h3>
+                        <div class="card-body muted small" style="display:grid; gap:0.5rem;">
+                          <div>👤 GV: <%= course.teacherName %></div>
+                          <div>📍 Phòng: <%= course.room %></div>
+                          <div style="margin-top:1rem; border-top: 1px solid var(--line); padding-top:1rem;">
+                            <div style="font-weight:800; margin-bottom:0.5rem;">THỜI GIAN HỌC</div>
+                            <div>📅 <%= course.timeRange %></div>
+                          </div>
                         </div>
-                        <div class="meta-item" style="display: flex; align-items: center; gap: 0.6rem;">
-                          <span style="font-size: 1rem; width: 20px; text-align: center;">📅</span>
-                          <span style="font-size: 0.85rem; color: var(--text-muted);">Ngày: <strong style="color: var(--text-main);"><%= date %></strong></span>
-                        </div>
-                        <div class="meta-item" style="display: flex; align-items: center; gap: 0.6rem;">
-                          <span style="font-size: 1rem; width: 20px; text-align: center;">🕒</span>
-                          <span style="font-size: 0.85rem; color: var(--text-muted);">Giờ: <strong style="color: var(--text-main);"><%= time %></strong></span>
-                        </div>
-                        <div class="meta-item" style="display: flex; align-items: center; gap: 0.6rem;">
-                          <span style="font-size: 1rem; width: 20px; text-align: center;">☀️</span>
-                          <span style="font-size: 0.85rem; color: var(--text-muted);">Buổi: <strong style="color: var(--text-main);"><%= shift %></strong></span>
-                        </div>
-                        <div class="meta-item" style="display: flex; align-items: flex-start; gap: 0.6rem; grid-column: 1 / -1; margin-top: 0.2rem; padding-top: 0.5rem; border-top: 1px solid var(--line);">
-                          <span style="font-size: 1rem; width: 20px; text-align: center;">📝</span>
-                          <span style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">Hình thức: <strong style="color: var(--text-main);"><%= format %></strong></span>
-                        </div>
-                      </div>
-                      
-                      <div class="term-schedule" style="margin-top: auto; padding-top: 0.8rem; border-top: 1px dashed var(--line); margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                        <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600;">
-                          Lần thi: <strong style="color: var(--text);"><%= attempt %></strong>
-                        </div>
-                        <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600;">
-                          Đợt thi: <strong style="color: var(--text);"><%= phase %></strong>
-                        </div>
-                      </div>
-                    </div>
-                  <% }) %>
-                </div>
-              <% }) %>
-
-              <% if (sortedSemNames.length === 0) { %>
-                <div class="alert alert-info" style="margin-top: 2rem;">
-                  Đã đăng nhập thành công nhưng không tìm thấy dữ liệu lịch thi nào.
-                </div>
-              <% } %>
-            </div>
-          <% } else if (result.viewType === 'combined') { %>
-            <% const weekly = result.weekly; %>
-            <% const term = result.term; %>
-            <div class="combined-view">
-              <div class="result-header">
-                <h2>Lịch học tuần (tổng <%= weekly.rows ? weekly.rows.length : 0 %> ca)</h2>
-                <p class="muted">Cập nhật: <%= weekly.fetchedAt %></p>
-              </div>
-              <div class="week-grid-wrap">
-                <table class="week-grid">
-                  <thead>
-                    <tr>
-                      <th>Ca</th>
-                      <th>Ngày</th>
-                      <th>Môn học</th>
-                      <th>Phòng</th>
-                      <th>Giảng viên</th>
-                      <th>Thời gian</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <% (weekly.rows || []).forEach(row => { %>
-                      <tr>
-                        <td><%= row[6] %></td>
-                        <td><%= row[0] %> <%= row[1] %></td>
-                        <td><%= row[2] %></td>
-                        <td><%= row[3] %></td>
-                        <td><%= row[4] %></td>
-                        <td><%= row[8] %></td>
-                      </tr>
-                    <% }) %>
-                  </tbody>
-                </table>
-              </div>
-
-              <div class="result-header" style="margin-top: 3rem;">
-                <h2>Lịch học kỳ</h2>
-                <p class="muted">Cập nhật: <%= term.fetchedAt %></p>
-              </div>
-              <% (term.results || []).forEach(sem => { %>
-                <div class="term-view">
-                  <div class="list-day-header">
-                    <h3><%= sem.semester %></h3>
-                  </div>
-                  <div class="term-grid">
-                    <% sem.rows.forEach(row => { %>
-                      <div class="term-card" style="--accent: <%= accentFromText(row[1]) %>;">
-                        <strong><%= row[1] %></strong> - <%= row[2] %> tín
                       </div>
                     <% }) %>
                   </div>
-                </div>
-              <% }) %>
-            </div>
-          <% } %>
-        <% } %>
-
-        <% if (!result) { %>
-          <section class="panel schedule-panel empty-state" id="lich-hoc" data-section="lich-hoc" style="max-width: 100%;">
-            <h2>Chưa có dữ liệu lịch học</h2>
-            <p>Đăng nhập ở khung bên trên để tải lịch học theo tuần và hiển thị theo giao diện mới.</p>
-          </section>
-        <% } %>
-            </section>
+                </section>
+              <% } else if (activeTab === 'exam') { %>
+                <section class="panel exam-panel">
+                  <div class="panel-header"><h2>Lịch thi của bạn</h2></div>
+                  <div class="exam-list" style="display: grid; gap: 1rem;">
+                    <% (result.exams || []).forEach(exam => { %>
+                      <div class="exam-item panel" style="display: flex; gap: 1.5rem; align-items: center; padding: 1.25rem;">
+                        <div class="exam-date" style="text-align: center; min-width: 80px; padding-right: 1.5rem; border-right: 1px solid var(--line);">
+                          <div style="font-size: 1.5rem; font-weight: 900;"><%= exam.date.split('/')[0] %></div>
+                          <div class="muted small">THÁNG <%= exam.date.split('/')[1] %></div>
+                        </div>
+                        <div style="flex: 1;">
+                          <h4 style="margin: 0 0 0.25rem 0;"><%= exam.subjectName %></h4>
+                          <div class="muted small">📍 <%= exam.room %> | ⏰ <%= exam.time %> | 🆔 SBD: <%= exam.sbd %></div>
+                        </div>
+                        <div class="exam-status">
+                          <span class="badge"><%= exam.format || "Thi viết" %></span>
+                        </div>
+                      </div>
+                    <% }) %>
+                    <% if (!(result.exams && result.exams.length)) { %>
+                      <div class="muted" style="text-align: center; padding: 2rem;">Chưa có lịch thi được công bố.</div>
+                    <% } %>
+                  </div>
+                </section>
+              <% } %>
+            <% } %>
           </main>
-
-          <footer class="site-footer">
-            <p>EAUT Schedule · UI pastel dễ nhìn · Không thay đổi logic backend.</p>
-          </footer>
         </div>
       </div>
     </div>
     <div id="loadingOverlay" class="loading-overlay is-hidden">
-      <div class="loading-content">
-        <div class="spinner"></div>
-        <p>Đang đồng bộ dữ liệu...</p>
-        <span class="loading-tip">Hệ thống đang cào dữ liệu trực tiếp từ cổng EAUT, vui lòng chờ giây lát.</span>
-      </div>
+      <div class="loading-content"><div class="spinner"></div><h2>Đang đồng bộ dữ liệu...</h2></div>
     </div>
-
-    <style>
-      .loading-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(8, 10, 22, 0.85);
-        backdrop-filter: blur(8px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-        transition: opacity 0.3s ease;
-      }
-      .loading-content {
-        text-align: center;
-        color: white;
-      }
-      .spinner {
-        width: 50px;
-        height: 50px;
-        border: 4px solid rgba(124, 139, 255, 0.1);
-        border-top-color: var(--primary);
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin: 0 auto 1.5rem;
-      }
-      @keyframes spin { to { transform: rotate(360deg); } }
-      .loading-content p {
-        font-size: 1.25rem;
-        font-weight: 800;
-        margin-bottom: 0.5rem;
-      }
-      .loading-tip {
-        font-size: 0.85rem;
-        color: var(--text-dim);
-      }
-      .loading-overlay.is-hidden {
-        opacity: 0;
-        pointer-events: none;
-      }
-    </style>
-
     <script src="/app.js"></script>
     <script>
-      // Quick refresh logic
-      const refreshBtn = document.getElementById('refreshBtn');
-      if (refreshBtn) {
-        refreshBtn.addEventListener('click', () => {
-          const url = new URL(window.location.href);
-          url.searchParams.set('refresh', 'true');
-          window.location.href = url.toString();
-        });
-      }
-
-      // Show loading on all form submits and major link clicks
-      const showLoading = () => document.getElementById('loadingOverlay').classList.remove('is-hidden');
-      
-      document.querySelectorAll('form').forEach(f => f.addEventListener('submit', showLoading));
-      document.querySelectorAll('.nav-item:not([target="_blank"]), .btn-primary:not([href^="#"]), #refreshBtn').forEach(el => {
-        el.addEventListener('click', (e) => {
-           if (e.currentTarget.tagName === 'A' && e.currentTarget.getAttribute('href').startsWith('/')) {
-             showLoading();
-           } else if (e.currentTarget.id === 'refreshBtn') {
-             showLoading();
-           }
-        });
+      const pb = document.getElementById('progressBar');
+      document.addEventListener('click', e => {
+        const a = e.target.closest('.nav-item');
+        if (a && a.getAttribute('href').startsWith('/')) {
+          e.preventDefault();
+          const href = a.getAttribute('href');
+          pb.style.display='block'; pb.style.width='80%';
+          fetch(href).then(r=>r.text()).then(html=>{
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            document.querySelector('.page-content').innerHTML = doc.querySelector('.page-content').innerHTML;
+            window.history.pushState({}, '', href);
+            document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('is-active', i.getAttribute('href')===href));
+          }).finally(()=>{ pb.style.width='100%'; setTimeout(()=>pb.style.display='none', 200); });
+        }
       });
+      const lf = document.getElementById('loginForm');
+      if (lf) lf.addEventListener('submit', () => document.getElementById('loadingOverlay').classList.remove('is-hidden'));
     </script>
   </body>
 </html>
