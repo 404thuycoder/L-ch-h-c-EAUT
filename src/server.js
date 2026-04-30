@@ -7,6 +7,7 @@ const { getStudentSchedule, getStudentTermSchedule, getStudentExamSchedule } = r
 dotenv.config();
 
 const app = express();
+app.set("trust proxy", 1); // Trust Vercel proxy for sessions
 const port = process.env.PORT || 5000;
 
 app.set("view engine", "ejs");
@@ -16,9 +17,13 @@ app.use(express.urlencoded({ extended: false }));
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "eaut-schedule-local-secret",
-    resave: false,
-    saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 60 },
+    resave: true,
+    saveUninitialized: true,
+    cookie: { 
+      maxAge: 1000 * 60 * 60 * 24, // 24 hours
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax"
+    },
   })
 );
 

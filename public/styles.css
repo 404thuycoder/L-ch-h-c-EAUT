@@ -1064,16 +1064,59 @@ select, input {
   margin-bottom: 1.5rem;
 }
 
-@media (max-width: 650px) {
-  .schedule-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1rem;
-    padding: 1rem;
+/* Mobile Fixes & Optimizations */
+@media (max-width: 600px) {
+  :root {
+    --header-height: 70px;
   }
-  .toolbar-group {
+
+  .site-header {
+    padding: 0 0.75rem;
+  }
+
+  /* Rút gọn thông tin user trên mobile để tránh tràn */
+  .user-btn {
+    padding: 0.3rem 0.5rem !important;
+  }
+
+  .user-btn div div:first-child {
+    max-width: 80px; /* Giới hạn độ dài tên */
+    font-size: 0.8rem !important;
+  }
+
+  .user-btn div div:last-child {
+    font-size: 0.7rem !important;
+  }
+
+  .header-actions {
+    gap: 0.4rem;
+  }
+
+  .icon-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 1.2rem;
+  }
+
+  /* Sửa ô chọn tuần bị dài quá */
+  select, input {
     width: 100% !important;
     min-width: 0 !important;
+  }
+
+  .toolbar-group {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .view-switch {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .view-switch .btn {
+    flex: 1;
   }
 }
 
